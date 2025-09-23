@@ -18,9 +18,24 @@
       margin: 5px;
       font-size: 16px;
     }
-    #insignias-container img {
+    #insignias-container {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .insignia {
+      text-align: center;
+      margin: 10px;
+    }
+    .insignia img {
       width: 50px;
-      margin: 5px;
+      display: block;
+      margin: 0 auto 5px;
+    }
+    .expira {
+      font-size: 12px;
+      color: #ccc;
     }
   </style>
 </head>
@@ -99,6 +114,11 @@
     }
 
     const { tipo, duracion } = codeDoc.data();
+    if (!tipo) {
+      alert("Este código no tiene tipo de verificación definido.");
+      return;
+    }
+
     const userRef = db.collection("users").doc(currentUserId);
     const userDoc = await userRef.get();
     if (!userDoc.exists) return;
@@ -119,18 +139,42 @@
 
   function cleanExpired(verifications) {
     const now = Date.now();
-    return verifications.filter(v => !v.expira || v.expira > now);
+    return verifications.filter(v => {
+      const expira = typeof v === "object" ? v.expira : null;
+      return !expira || expira > now;
+    });
   }
 
   function renderInsignias(verifications) {
     insigniasContainer.innerHTML = "";
     verifications.forEach(v => {
-      const info = insigniasMap[v.tipo.toLowerCase()];
+      const tipo = typeof v === "string" ? v : v?.tipo;
+      if (!tipo) return;
+
+      const info = insigniasMap[tipo.toLowerCase()];
       if (info) {
+        const div = document.createElement("div");
+        div.className = "insignia";
+
         const img = document.createElement("img");
         img.src = info.src;
         img.title = info.text;
-        insigniasContainer.appendChild(img);
+
+        const label = document.createElement("div");
+        label.textContent = info.text;
+
+        div.appendChild(img);
+        div.appendChild(label);
+
+        if (v.expira) {
+          const fecha = new Date(v.expira);
+          const expiraDiv = document.createElement("div");
+          expiraDiv.className = "expira";
+          expiraDiv.textContent = `Expira: ${fecha.toLocaleDateString("es-MX")}`;
+          div.appendChild(expiraDiv);
+        }
+
+        insigniasContainer.appendChild(div);
       }
     });
   }
