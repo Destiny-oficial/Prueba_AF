@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Verificación por Código</title>
+  <style>
+    body {
+      background-color: #0b0b0c;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 50px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+    }
+    #insignias-container img {
+      width: 50px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Ingresa tu código de regalo</h1>
+<input type="text" id="code-input" placeholder="Código">
+<button id="verify-btn">Verificar</button>
+
+<div id="insignias-container"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAu0WbdAi8_yA2S6qKMUCLfty5w0PxgKVE",
+    authDomain: "anime-offis.firebaseapp.com",
+    projectId: "anime-offis",
+    storageBucket: "anime-offis.appspot.com",
+    messagingSenderId: "377121993034",
+    appId: "1:377121993034:web:a4ba7995e827bcbea411b3"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+
+  const insigniasMap = {
+    "creador": {src:"crea.png", text:"Creador ❄️"},
+    "beta": {src:"beta.png", text:"Usuario Beta ⚙️"},
+    "platinum": {src:"plat.png", text:"Platinum 👑"},
+    "imperial": {src:"imperial.png", text:"Imperial 🏆"},
+    "colaborador": {src:"cola.png", text:"Colaborador 🤝"},
+    "aportador": {src:"aportador.png", text:"Aportador ⚡"},
+    "soporte": {src:"soport.png", text:"Soporte ✅"},
+    "dora": {src:"verif.png", text:"Verificado Premium ✅"},
+    "azul": {src:"azul.png", text:"Fan Anime Offis ✅"},
+    "verde": {src:"verde.png", text:"Fan Básico ✅"}
+  };
+
+  const codeInput = document.getElementById("code-input");
+  const verifyBtn = document.getElementById("verify-btn");
+  const insigniasContainer = document.getElementById("insignias-container");
+
+  let currentUserId = null;
+
+  auth.onAuthStateChanged(async user => {
+    if (user) {
+      currentUserId = user.uid;
+      const userRef = db.collection("users").doc(currentUserId);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) return;
+
+      let verifications = userDoc.data().verified || [];
+      verifications = cleanExpired(verifications);
+      await userRef.set({verified: verifications}, {merge: true});
+      renderInsignias(verifications);
+    } else {
+      alert("Debes iniciar sesión para usar esta función.");
+    }
+  });
+
+  verifyBtn.addEventListener("click", async () => {
+    if (!currentUserId) {
+      alert("Usuario no autenticado.");
+      return;
+    }
+
+    const code = codeInput.value.trim().toUpperCase();
+    const codeDoc = await db.collection("codes").doc(code).get();
+    if (!codeDoc.exists) {
+      alert("Código inválido o no registrado.");
+      return;
+    }
+
+    const { tipo, duracion } = codeDoc.data();
+    const userRef = db.collection("users").doc(currentUserId);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return;
+
+    let verifications = userDoc.data().verified || [];
+    verifications = cleanExpired(verifications);
+
+    const alreadyHas = verifications.some(v => v.tipo === tipo);
+    if (!alreadyHas) {
+      const expira = duracion ? Date.now() + duracion * 86400000 : null;
+      verifications.push({tipo, expira});
+      await userRef.set({verified: verifications}, {merge: true});
+    }
+
+    renderInsignias(verifications);
+    alert(`¡Código válido! Se te ha asignado la verificación: ${insigniasMap[tipo]?.text || tipo}`);
+  });
+
+  function cleanExpired(verifications) {
+    const now = Date.now();
+    return verifications.filter(v => !v.expira || v.expira > now);
+  }
+
+  function renderInsignias(verifications) {
+    insigniasContainer.innerHTML = "";
+    verifications.forEach(v => {
+      const info = insigniasMap[v.tipo.toLowerCase()];
+      if (info) {
+        const img = document.createElement("img");
+        img.src = info.src;
+        img.title = info.text;
+        insigniasContainer.appendChild(img);
+      }
+    });
+  }
+</script>
+</body>
+</html>
