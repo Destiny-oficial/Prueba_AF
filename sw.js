@@ -1,26 +1,57 @@
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open('anime-offis-cache').then(cache => {
-      return cache.addAll([
-  '/anime-offis/index.html',
-  '/anime-offis/styles.css',
-  '/anime-offis/script.js',
-  '/anime-offis/icon-192.png',
-  '/anime-offis/icon-512.png',
-  '/anime-offis/offis.png',
-  '/anime-offis/perfil.html',
-  '/anime-offis/dashboard.html',
-  '/anime-offis/mora.jpg',
-  '/anime-offis/login.png'
-]);
-    })
+const CACHE_NAME = "animeoffis-GDLv2"; // 🔄 Cambia el número cuando hagas cambios importantes
+const FILES_TO_CACHE = [
+  "/",                // Página principal
+  "/dashboard",
+  "/styles",
+  "/script.js",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/offis.png",
+  "/perfil.html",
+  "/perfil.js",
+  "/perfil.css",
+  "/mora.jpg",
+  "/login.png",
+  "/acerca.html",
+  "/offis512.png",
+  "/offis192.png
+];
+
+// Instalar y guardar los archivos en caché (primera vez o si cambias el CACHE_NAME)
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(FILES_TO_CACHE))
   );
 });
 
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(response => {
-      return response || fetch(e.request);
-    })
+// Activar y borrar cachés viejos
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    )
+  );
+});
+
+// Estrategia network first: busca primero en la red
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // ✅ Si hay internet, guarda la nueva versión en caché
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+        return response;
+      })
+      .catch(() => {
+        // ❌ Si no hay internet, usa la versión en caché
+        return caches.match(event.request);
+      })
   );
 });
